@@ -59,6 +59,7 @@
                     <select id="templateSelect" class="w-full p-2 border rounded-md bg-white">
                         <option value="marketwatch">MarketWatch Default</option>
                         <option value="barrons">Barron's Default</option>
+                        <option value="mw-advice">MW Advice</option>
                     </select>
                 </div>
                 
@@ -123,6 +124,7 @@
     <script type="module">
         import { renderMarketWatch } from './templates/marketwatch.js';
         import { renderBarrons } from './templates/barrons.js';
+        import { renderMWAdvice } from './templates/mw-advice.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- DOM ELEMENT REFERENCES ---
@@ -191,6 +193,8 @@
                             renderMarketWatch(ctx, canvas, state, marketWatchLogo, drawAspectFill, wrapText);
                         } else if (state.template === 'barrons') {
                             renderBarrons(ctx, canvas, state, drawAspectFill, wrapText);
+                        } else if (state.template === 'mw-advice') {
+                            renderMWAdvice(ctx, canvas, state, marketWatchLogo, drawAspectFill, wrapText);
                         }
                     });
                 });

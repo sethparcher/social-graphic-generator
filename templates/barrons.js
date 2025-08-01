@@ -18,28 +18,33 @@ export function renderBarrons(ctx, canvas, state, drawAspectFill, wrapText) {
     ctx.fillStyle = 'black';
     ctx.fillRect(0, imgHeight, canvas.width, textBoxHeight);
 
+    // 3. Draw "EXCLUSIVE" tag if checked - centered on border
     let textY = imgHeight + 100;
-
-    // 3. Draw "EXCLUSIVE" tag if checked
     if (state.showExclusive) {
+        const tagWidth = 170;
+        const tagHeight = 40;
+        const tagX = (canvas.width - tagWidth) / 2;
+        const tagY = imgHeight - tagHeight / 2; // Center on the border
+        
         ctx.fillStyle = '#E7B402'; // Barron's Yellow
-        ctx.fillRect(60, textY - 55, 170, 40);
+        ctx.fillRect(tagX, tagY, tagWidth, tagHeight);
         ctx.fillStyle = 'black';
         ctx.font = 'bold 28px Lato';
         ctx.textAlign = 'center';
-        ctx.fillText('EXCLUSIVE', 60 + 170 / 2, textY - 25);
+        ctx.fillText('EXCLUSIVE', tagX + tagWidth / 2, tagY + tagHeight / 2 + 10);
         textY += 30;
     }
     
     // 4. Draw headline
     ctx.fillStyle = 'white';
-    ctx.font = "700 80px 'Playfair Display'";
-    ctx.textAlign = 'left';
-    const headlineLines = wrapText(state.headline, 60, textY, 960, 90);
+    ctx.font = "700 64px 'Playfair Display'";
+    ctx.textAlign = 'center';
+    const headlineLines = wrapText(state.headline, canvas.width / 2, textY, 960, 75);
     
     // 5. Draw subheadline
-    const subheadlineY = textY + (headlineLines * 90) + 10;
+    const subheadlineY = textY + (headlineLines * 75) + 10;
     ctx.fillStyle = '#DDDDDD';
-    ctx.font = '400 36px Lato';
-    wrapText(state.subheadline, 60, subheadlineY, 960, 45);
+    ctx.font = '400 30px Lato';
+    ctx.textAlign = 'center';
+    wrapText(state.subheadline, canvas.width / 2, subheadlineY, 960, 38);
 }
