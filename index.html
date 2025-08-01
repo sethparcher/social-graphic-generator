@@ -291,24 +291,40 @@
                 try {
                     console.log('Fetching URL:', url);
                     
-                    // Use cors-anywhere proxy which is typically faster
-                    const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+                    let htmlContent;
                     
-                    const response = await fetch(proxyUrl, {
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
+                    // Try multiple proxy services in order
+                    const proxies = [
+                        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+                        `https://cors-anywhere.herokuapp.com/${url}`,
+                        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+                    ];
+                    
+                    for (const proxyUrl of proxies) {
+                        try {
+                            const response = await fetch(proxyUrl, {
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                if (proxyUrl.includes('allorigins')) {
+                                    const data = await response.json();
+                                    htmlContent = data.contents;
+                                } else {
+                                    htmlContent = await response.text();
+                                }
+                                break;
+                            }
+                        } catch (proxyError) {
+                            console.log(`Proxy ${proxyUrl} failed:`, proxyError);
+                            continue;
                         }
-                    });
+                    }
                     
-                    if (!response.ok) {
-                        // Fallback to allorigins if cors-anywhere fails
-                        const fallbackUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-                        const fallbackResponse = await fetch(fallbackUrl);
-                        if (!fallbackResponse.ok) throw new Error(`HTTP error! status: ${fallbackResponse.status}`);
-                        const fallbackData = await fallbackResponse.json();
-                        var htmlContent = fallbackData.contents;
-                    } else {
-                        var htmlContent = await response.text();
+                    if (!htmlContent) {
+                        throw new Error('All proxy services failed');
                     }
                     
                     const parser = new DOMParser();
@@ -371,8 +387,8 @@
 
                 } catch (error) {
                     console.error('Fetch Error:', error);
-                    setLoading(false); // Reset loading state before alert
-                    alert(`Could not fetch data from the URL: ${error.message}`);
+                    setLoading(false);
+                    alert(`Could not fetch data from the URL: ${error.message}. Try visiting https://cors-anywhere.herokuapp.com/corsdemo to enable CORS access.`);
                 }
             }
             
