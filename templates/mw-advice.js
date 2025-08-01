@@ -5,7 +5,7 @@ export function renderMWAdvice(ctx, canvas, state, marketWatchLogo, drawAspectFi
 
     // 2. Draw "ADVICE" header
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 48px Helvetica, Arial, sans-serif';
+    ctx.font = 'bold 36px Helvetica, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('ADVICE', canvas.width / 2, 120);
 
@@ -18,7 +18,7 @@ export function renderMWAdvice(ctx, canvas, state, marketWatchLogo, drawAspectFi
     // 4. Draw image in bottom section (centered, with padding)
     const imageY = 420;
     const imageHeight = 480;
-    const imageWidth = 720;
+    const imageWidth = 800;
     const imageX = (canvas.width - imageWidth) / 2;
     
     ctx.save();
@@ -32,10 +32,6 @@ export function renderMWAdvice(ctx, canvas, state, marketWatchLogo, drawAspectFi
     const logoHeight = 60;
     const logoWidth = marketWatchLogo.width * (logoHeight / marketWatchLogo.height);
     if (logoWidth) {
-        // Create white background for logo
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect((canvas.width - logoWidth - 40) / 2, canvas.height - logoHeight - 60, logoWidth + 40, logoHeight + 20);
-        
         ctx.drawImage(marketWatchLogo, (canvas.width - logoWidth) / 2, canvas.height - logoHeight - 50, logoWidth, logoHeight);
     }
 }
