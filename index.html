@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Graphic Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        /* Define custom fonts for canvas usage */
+        body { font-family: 'Lato', sans-serif; }
+        .font-playfair { font-family: 'Playfair Display', serif; }
+        .font-lato { font-family: 'Lato', sans-serif; }
+        /* Simple loading spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold">Social Media Graphic Generator</h1>
+            <p class="text-gray-600">Paste an article link, customize, and drag the image to position it.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- CONTROLS PANEL -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">🎨 Controls</h2>
+
+                <!-- 1. URL Input -->
+                <div class="mb-4">
+                    <label for="urlInput" class="block font-bold mb-2">Article URL</label>
+                    <div class="flex items-center">
+                        <input type="text" id="urlInput" placeholder="https://www.marketwatch.com/..." class="w-full p-2 border rounded-l-md focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <button id="fetchButton" class="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 font-semibold flex items-center justify-center h-[42px]">
+                            <span id="fetchButtonText">Fetch</span>
+                            <div id="loader" class="loader hidden"></div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Template Selector -->
+                <div class="mb-4">
+                    <label for="templateSelect" class="block font-bold mb-2">Template</label>
+                    <select id="templateSelect" class="w-full p-2 border rounded-md bg-white">
+                        <option value="marketwatch">MarketWatch Default</option>
+                        <option value="barrons">Barron's Default</option>
+                    </select>
+                </div>
+                
+                <!-- Barron's Exclusive Checkbox -->
+                <div id="exclusiveContainer" class="mb-4 hidden">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="exclusiveCheckbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        <span class="ml-2">Show "EXCLUSIVE" Tag</span>
+                    </label>
+                </div>
+
+                <!-- 3. Manual Editing -->
+                <div class="mb-4">
+                    <label for="headlineInput" class="block font-bold mb-2">Headline</label>
+                    <textarea id="headlineInput" rows="3" class="w-full p-2 border rounded-md"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="subheadlineInput" class="block font-bold mb-2">Subheadline / Description</label>
+                    <textarea id="subheadlineInput" rows="4" class="w-full p-2 border rounded-md"></textarea>
+                </div>
+
+                <!-- 4. Image Override -->
+                <div class="mb-4">
+                    <label class="block font-bold mb-2">Override Image</label>
+                    <input type="text" id="imageUrlInput" placeholder="Paste image URL here..." class="w-full p-2 border rounded-md mb-2">
+                    <label for="imageUpload" class="w-full text-center bg-gray-200 text-gray-700 p-2 rounded-md hover:bg-gray-300 cursor-pointer block">
+                        Or Upload Image File
+                    </label>
+                    <input type="file" id="imageUpload" class="hidden" accept="image/*">
+                </div>
+
+                <!-- 5. Export -->
+                <div class="mt-6">
+                    <button id="downloadButton" class="w-full bg-green-600 text-white py-3 rounded-md hover:bg-green-700 font-bold text-lg">
+                        ⬇️ Download JPG
+                    </button>
+                </div>
+            </div>
+
+            <!-- CANVAS PREVIEW -->
+            <div class="flex items-center justify-center bg-white p-6 rounded-lg shadow-md">
+                <canvas id="canvas" width="1080" height="1080" class="w-full h-auto border cursor-move"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { renderMarketWatch } from './templates/marketwatch.js';
+        import { renderBarrons } from './templates/barrons.js';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM ELEMENT REFERENCES ---
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            const urlInput = document.getElementById('urlInput');
+            const fetchButton = document.getElementById('fetchButton');
+            const fetchButtonText = document.getElementById('fetchButtonText');
+            const loader = document.getElementById('loader');
+
+            const templateSelect = document.getElementById('templateSelect');
+            const exclusiveContainer = document.getElementById('exclusiveContainer');
+            const exclusiveCheckbox = document.getElementById('exclusiveCheckbox');
+
+            const headlineInput = document.getElementById('headlineInput');
+            const subheadlineInput = document.getElementById('subheadlineInput');
+            
+            const imageUrlInput = document.getElementById('imageUrlInput');
+            const imageUpload = document.getElementById('imageUpload');
+            const downloadButton = document.getElementById('downloadButton');
+
+            // --- ASSET LOADING ---
+            const marketWatchLogo = new Image();
+            marketWatchLogo.crossOrigin = 'Anonymous';
+            // Use a CORS proxy for the logo to avoid tainting the canvas
+            marketWatchLogo.src = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://1000logos.net/wp-content/uploads/2024/09/MarketWatch-Emblem.png')}`;
+            marketWatchLogo.onload = () => {
+                // Redraw canvas once the logo is loaded to make sure it appears
+                renderCanvas();
+            };
+
+            // --- STATE MANAGEMENT ---
+            let state = {
+                headline: "This is a Great Headline About the Stock Market",
+                subheadline: "Here is a compelling description that gives more context to the main headline.",
+                image: new Image(),
+                template: 'marketwatch',
+                showExclusive: false,
+                imageOffsetX: 0, // Panning offset X
+                imageOffsetY: 0, // Panning offset Y
+            };
+            
+            // --- DRAG STATE (not part of main data state) ---
+            let isDragging = false;
+            let dragStartX, dragStartY;
+
+            // Set CORS policy for the image to avoid canvas tainting
+            state.image.crossOrigin = 'Anonymous';
+            
+            // --- INITIAL SETUP ---
+            state.image.src = 'https://images.unsplash.com/photo-1554224155-8d04421cd695?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzVmMzJ8MHwxfGFsbHwxfHx8fHx8fHx8fDE3MjIyNjU5OTR8&ixlib=rb-4.0.3&q=80&w=1080';
+            state.image.onload = () => {
+                resetImagePosition();
+                updateInputsFromState();
+                renderCanvas();
+            };
+
+            // --- CORE RENDERING FUNCTION ---
+            function renderCanvas() {
+                document.fonts.load("700 80px 'Playfair Display'").then(() => {
+                    document.fonts.load("400 36px 'Lato'").then(() => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        if (state.template === 'marketwatch') {
+                            renderMarketWatch(ctx, canvas, state, marketWatchLogo, drawAspectFill, wrapText);
+                        } else if (state.template === 'barrons') {
+                            renderBarrons(ctx, canvas, state, drawAspectFill, wrapText);
+                        }
+                    });
+                });
+            }
+
+            // --- HELPER FUNCTIONS ---
+
+            /**
+             * Draws an image to fill a container while maintaining aspect ratio.
+             * @param {HTMLImageElement} img - The image to draw.
+             * @param {number} x - The x-coordinate of the container.
+             * @param {number} y - The y-coordinate of the container.
+             * @param {number} w - The width of the container.
+             * @param {number} h - The height of the container.
+             */
+            function drawAspectFill(img, x, y, w, h) {
+                if (!img.width || !img.height) return;
+
+                const imgRatio = img.width / img.height;
+                const containerRatio = w / h;
+                let finalWidth, finalHeight;
+
+                if (imgRatio > containerRatio) {
+                    // Image is wider than container, so height determines scale
+                    finalHeight = h;
+                    finalWidth = h * imgRatio;
+                } else {
+                    // Image is taller than or same ratio as container, so width determines scale
+                    finalWidth = w;
+                    finalHeight = w / imgRatio;
+                }
+
+                // Center the image and apply the pan offset
+                const finalX = x + (w - finalWidth) / 2 + state.imageOffsetX;
+                const finalY = y + (h - finalHeight) / 2 + state.imageOffsetY;
+                
+                ctx.drawImage(img, finalX, finalY, finalWidth, finalHeight);
+            }
+
+            function resetImagePosition() {
+                state.imageOffsetX = 0;
+                state.imageOffsetY = 0;
+            }
+
+            function wrapText(text, x, y, maxWidth, lineHeight, fromBottom = false) {
+                const words = text.split(' ');
+                let line = '';
+                let lines = [];
+                
+                for (let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n] + ' ';
+                    const metrics = ctx.measureText(testLine);
+                    const testWidth = metrics.width;
+                    if (testWidth > maxWidth && n > 0) {
+                        lines.push(line);
+                        line = words[n] + ' ';
+                    } else {
+                        line = testLine;
+                    }
+                }
+                lines.push(line);
+
+                if (fromBottom) {
+                    let currentY = y;
+                    for (let i = lines.length - 1; i >= 0; i--) {
+                        ctx.fillText(lines[i].trim(), x, currentY);
+                        currentY -= lineHeight;
+                    }
+                } else {
+                    let currentY = y;
+                    for (let i = 0; i < lines.length; i++) {
+                        ctx.fillText(lines[i].trim(), x, currentY);
+                        currentY += lineHeight;
+                    }
+                }
+                
+                return lines.length;
+            }
+
+            async function fetchArticleData() {
+                const url = urlInput.value;
+                if (!url) {
+                    alert('Please enter a URL.');
+                    return;
+                }
+                
+                setLoading(true);
+                
+                try {
+                    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const data = await response.json();
+                    const htmlContent = data.contents;
+                    
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlContent, 'text/html');
+                    
+                    const title = doc.querySelector('meta[property="og:title"]');
+                    const description = doc.querySelector('meta[property="og:description"]');
+                    const imageUrl = doc.querySelector('meta[property="og:image"]');
+                    
+                    state.headline = title ? title.getAttribute('content') : 'Headline not found.';
+                    state.subheadline = description ? description.getAttribute('content') : 'Description not found.';
+                    
+                    if (imageUrl) {
+                        state.image.src = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl.getAttribute('content'))}`;
+                    } else {
+                        state.image.src = 'https://images.unsplash.com/photo-1554224155-8d04421cd695?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzVmMzJ8MHwxfGFsbHwxfHx8fHx8fHx8fDE3MjIyNjU5OTR8&ixlib=rb-4.0.3&q=80&w=1080';
+                    }
+
+                    state.image.onload = () => {
+                        resetImagePosition();
+                        updateInputsFromState();
+                        renderCanvas();
+                        setLoading(false);
+                    };
+                    state.image.onerror = () => {
+                        alert('Failed to load the article image. You can provide a URL or upload a file manually.');
+                        state.image.src = 'https://images.unsplash.com/photo-1554224155-8d04421cd695?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzVmMzJ8MHwxfGFsbHwxfHx8fHx8fHx8fDE3MjIyNjU5OTR8&ixlib=rb-4.0.3&q=80&w=1080';
+                        state.image.onload = () => {
+                            resetImagePosition();
+                            updateInputsFromState();
+                            renderCanvas();
+                            setLoading(false);
+                        }
+                    }
+
+                } catch (error) {
+                    console.error('Fetch Error:', error);
+                    alert('Could not fetch data from the URL. It might be blocked or invalid.');
+                    setLoading(false);
+                }
+            }
+            
+            function updateInputsFromState() {
+                headlineInput.value = state.headline;
+                subheadlineInput.value = state.subheadline;
+            }
+
+            function setLoading(isLoading) {
+                if (isLoading) {
+                    fetchButtonText.classList.add('hidden');
+                    loader.classList.remove('hidden');
+                    fetchButton.disabled = true;
+                } else {
+                    fetchButtonText.classList.remove('hidden');
+                    loader.classList.add('hidden');
+                    fetchButton.disabled = false;
+                }
+            }
+            
+            function toggleTemplateControls() {
+                state.template = templateSelect.value;
+                if (state.template === 'barrons') {
+                    exclusiveContainer.classList.remove('hidden');
+                    subheadlineInput.disabled = false;
+                    subheadlineInput.classList.remove('bg-gray-100');
+                } else {
+                    exclusiveContainer.classList.add('hidden');
+                    subheadlineInput.disabled = true;
+                    subheadlineInput.classList.add('bg-gray-100');
+                }
+                renderCanvas();
+            }
+
+            // --- EVENT LISTENERS ---
+            fetchButton.addEventListener('click', fetchArticleData);
+            urlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') fetchArticleData();
+            });
+
+            templateSelect.addEventListener('change', toggleTemplateControls);
+            exclusiveCheckbox.addEventListener('change', (e) => {
+                state.showExclusive = e.target.checked;
+                renderCanvas();
+            });
+
+            headlineInput.addEventListener('input', (e) => {
+                state.headline = e.target.value;
+                renderCanvas();
+            });
+            subheadlineInput.addEventListener('input', (e) => {
+                state.subheadline = e.target.value;
+                renderCanvas();
+            });
+            
+            imageUrlInput.addEventListener('input', (e) => {
+                state.image.src = e.target.value;
+                state.image.onload = () => {
+                    resetImagePosition();
+                    renderCanvas();
+                };
+            });
+
+            imageUpload.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    state.image.src = URL.createObjectURL(file);
+                    state.image.onload = () => {
+                        resetImagePosition();
+                        renderCanvas();
+                    };
+                    imageUrlInput.value = '';
+                }
+            });
+
+            downloadButton.addEventListener('click', () => {
+                const link = document.createElement('a');
+                const fileName = state.headline.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
+                link.download = `${fileName || 'social-graphic'}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 1.0);
+                link.click();
+            });
+
+            // --- DRAG AND DROP LISTENERS ---
+            function getMousePos(canvasEl, evt) {
+                const rect = canvasEl.getBoundingClientRect();
+                const scaleX = canvasEl.width / rect.width;
+                const scaleY = canvasEl.height / rect.height;
+                return {
+                    x: (evt.clientX - rect.left) * scaleX,
+                    y: (evt.clientY - rect.top) * scaleY
+                };
+            }
+
+            canvas.addEventListener('mousedown', (e) => {
+                const pos = getMousePos(canvas, e);
+                isDragging = true;
+                dragStartX = pos.x - state.imageOffsetX;
+                dragStartY = pos.y - state.imageOffsetY;
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const pos = getMousePos(canvas, e);
+                    state.imageOffsetX = pos.x - dragStartX;
+                    state.imageOffsetY = pos.y - dragStartY;
+                    renderCanvas();
+                }
+            });
+
+            // --- INITIALIZATION CALL ---
+            toggleTemplateControls();
+        });
+    </script>
+
+</body>
+</html>
