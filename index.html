@@ -289,88 +289,55 @@
                 setLoading(true);
                 
                 try {
-                    console.log('Fetching URL:', url);
+                    console.log('Fetching URL:', url); // Debug log
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                    console.log('Proxy URL:', proxyUrl); // Debug log
                     
-                    // Use cors-anywhere proxy which is typically faster
-                    const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+                    const response = await fetch(proxyUrl);
+                    console.log('Response status:', response.status); // Debug log
                     
-                    const response = await fetch(proxyUrl, {
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     
-                    if (!response.ok) {
-                        // Fallback to allorigins if cors-anywhere fails
-                        const fallbackUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-                        const fallbackResponse = await fetch(fallbackUrl);
-                        if (!fallbackResponse.ok) throw new Error(`HTTP error! status: ${fallbackResponse.status}`);
-                        const fallbackData = await fallbackResponse.json();
-                        var htmlContent = fallbackData.contents;
-                    } else {
-                        var htmlContent = await response.text();
-                    }
+                    const data = await response.json();
+                    console.log('Fetched data:', data); // Debug log
+                    
+                    const htmlContent = data.contents;
                     
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(htmlContent, 'text/html');
                     
-                    // Try multiple selectors for better compatibility
-                    const title = doc.querySelector('meta[property="og:title"]') || 
-                                 doc.querySelector('meta[name="twitter:title"]') ||
-                                 doc.querySelector('title');
+                    const title = doc.querySelector('meta[property="og:title"]');
+                    const description = doc.querySelector('meta[property="og:description"]');
+                    const imageUrl = doc.querySelector('meta[property="og:image"]');
                     
-                    const description = doc.querySelector('meta[property="og:description"]') || 
-                                       doc.querySelector('meta[name="twitter:description"]') ||
-                                       doc.querySelector('meta[name="description"]');
+                    console.log('Parsed metadata:', { title: title?.getAttribute('content'), description: description?.getAttribute('content'), imageUrl: imageUrl?.getAttribute('content') }); // Debug log
                     
-                    const imageUrl = doc.querySelector('meta[property="og:image"]') || 
-                                    doc.querySelector('meta[name="twitter:image"]');
-                    
-                    // Update text immediately
-                    state.headline = title ? (title.getAttribute('content') || title.textContent) : 'Headline not found.';
+                    state.headline = title ? title.getAttribute('content') : 'Headline not found.';
                     state.subheadline = description ? description.getAttribute('content') : 'Description not found.';
-                    updateInputsFromState();
                     
-                    // Load image in parallel
                     if (imageUrl) {
-                        const imgSrc = imageUrl.getAttribute('content');
-                        // Try direct image first, fallback to proxy if needed
-                        const img = new Image();
-                        img.crossOrigin = 'Anonymous';
-                        
-                        img.onload = () => {
-                            state.image = img;
-                            resetImagePosition();
-                            renderCanvas();
-                            setLoading(false);
-                        };
-                        
-                        img.onerror = () => {
-                            // Fallback to proxy for image
-                            img.src = `https://api.allorigins.win/raw?url=${encodeURIComponent(imgSrc)}`;
-                            img.onerror = () => {
-                                console.error('Image failed to load');
-                                state.image.src = 'https://images.unsplash.com/photo-1554224155-8d04421cd695?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzVmMzJ8MHwxfGFsbHwxfHx8fHx8fHx8fDE3MjIyNjU5OTR8&ixlib=rb-4.0.3&q=80&w=1080';
-                                state.image.onload = () => {
-                                    resetImagePosition();
-                                    renderCanvas();
-                                    setLoading(false);
-                                };
-                            };
-                        };
-                        
-                        img.src = imgSrc;
+                        state.image.src = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl.getAttribute('content'))}`;
                     } else {
+                        state.image.src = 'https://images.unsplash.com/photo-1554224155-8d04421cd695?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzVmMzJ8MHwxfGFsbHwxfHx8fHx8fHx8fDE3MjIyNjU5OTR8&ixlib=rb-4.0.3&q=80&w=1080';
+                    }
+
+                    state.image.onload = () => {
+                        resetImagePosition();
+                        updateInputsFromState();
+                        renderCanvas();
+                        setLoading(false);
+                    };
+                    state.image.onerror = () => {
+                        console.error('Image failed to load');
+                        alert('Failed to load the article image. You can provide a URL or upload a file manually.');
                         state.image.src = 'https://images.unsplash.com/photo-1554224155-8d04421cd695?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wzNzVmMzJ8MHwxfGFsbHwxfHx8fHx8fHx8fDE3MjIyNjU5OTR8&ixlib=rb-4.0.3&q=80&w=1080';
                         state.image.onload = () => {
                             resetImagePosition();
+                            updateInputsFromState();
                             renderCanvas();
                             setLoading(false);
-                        };
+                        }
                     }
-                    
-                    // Render canvas immediately with text (before image loads)
-                    renderCanvas();
 
                 } catch (error) {
                     console.error('Fetch Error:', error);
